@@ -16,10 +16,10 @@ export default function Home() {
         // const randomIndex = Math.floor(Math.random() * words.length);
         // const word = words[randomIndex]; // TODO fetch api
 
-        const response = await fetch("/api/word");
+        const response = await fetch("http://localhost:8000/api/word");
         const result = await response.json();
         
-        setCurrentWord(result.data);
+        setCurrentWord(data);
         setSentence('');
         setScore(0);
         setFeedbackColor('text-gray-700');
@@ -40,28 +40,25 @@ export default function Home() {
         }
     };
 
-    const handleSubmitSentence = () => {
+        const handleSubmitSentence = async () => {
         if (currentWord) {
-            const newScore = scoreSentence(currentWord.word, sentence);
-            setScore(newScore);
+            const response = await fetch('http://localhost:8000/api/validate-sentence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    word_id: 1,
+                    sentence: currentWord.definition
+                })
+            });
 
-            if (newScore >= 8.0) {
-                setFeedbackColor('text-success');
-            } else if (newScore >= 6.0) {
-                setFeedbackColor('text-warning');
-            } else {
-                setFeedbackColor('text-danger');
+            if (!response.ok) {
+                throw new Error('Failed to validate sentence');
             }
 
-            const history = JSON.parse(localStorage.getItem('wordHistory') || '[]');
-            history.push({
-                word: currentWord.word,
-                sentence: sentence,
-                score: newScore,
-                difficulty: currentWord.difficulty,
-                timestamp: new Date().toISOString(),
-            });
-            localStorage.setItem('wordHistory', JSON.stringify(history));
+            const data = await response.json();
+            setScore(data.score);
             setIsSubmitted(true);
         }
     };
