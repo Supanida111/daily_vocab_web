@@ -1,137 +1,181 @@
+// src/app/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { words } from '@/data/words';
-import { Word, Difficulty } from '@/types';
-import { scoreSentence } from '@/lib/scoring';
+import React, { useEffect, useState } from "react";
 
-export default function Home() {
-    const [currentWord, setCurrentWord] = useState<Word | null>(null);
-    const [sentence, setSentence] = useState<string>('');
-    const [score, setScore] = useState<number>(0);
-    const [feedbackColor, setFeedbackColor] = useState<string>('text-gray-700');
-    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+type Word = {
+  id: number;
+  word: string;
+  definition: string | null;
+  difficulty_level: string;
+};
 
-    const getRandomWord = useCallback(async () => {
-        // const randomIndex = Math.floor(Math.random() * words.length);
-        // const word = words[randomIndex]; // TODO fetch api
+type ValidationResult = {
+  score: number;
+  level: string;
+  suggestion: string;
+  corrected_sentence: string;
+};
 
-        const response = await fetch("http://localhost:8000/api/word");
-        const result = await response.json();
-        
-        setCurrentWord(data);
-        setSentence('');
-        setScore(0);
-        setFeedbackColor('text-gray-700');
-        setIsSubmitted(false);
-    }, []);
+export default function HomePage() {
+  const [currentWord, setCurrentWord] = useState<Word | null>(null);
+  const [sentence, setSentence] = useState("");
+  const [result, setResult] = useState<ValidationResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        getRandomWord();
-    }, [getRandomWord]);
+  // โหลดคำศัพท์สุ่มตอนเปิดหน้า
+  useEffect(() => {
+    fetchWord();
+  }, []);
 
-    const handleSentenceChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setSentence(e.target.value);
-        // Reset score and feedback if user starts typing again after submission
-        if (isSubmitted) {
-            setScore(0);
-            setFeedbackColor('text-gray-700');
-            setIsSubmitted(false);
-        }
-    };
+  const fetchWord = async () => {
+    try {
+      setError(null);
+      setResult(null);
+      setSubmitted(false);
 
-        const handleSubmitSentence = async () => {
-        if (currentWord) {
-            const response = await fetch('http://localhost:8000/api/validate-sentence', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    word_id: 1,
-                    sentence: currentWord.definition
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to validate sentence');
-            }
-
-            const data = await response.json();
-            setScore(data.score);
-            setIsSubmitted(true);
-        }
-    };
-
-    const handleNextWord = () => {
-        getRandomWord();
-    };
-
-    const getDifficultyColor = (difficulty: Difficulty) => {
-        switch (difficulty) {
-            case "Beginner":
-                return "bg-green-200 text-green-800";
-            case "Intermediate":
-                return "bg-yellow-200 text-yellow-800";
-            case "Advanced":
-                return "bg-red-200 text-red-800";
-            default:
-                return "bg-gray-200 text-gray-800";
-        }
-    };
-
-    if (!currentWord) {
-        return <div className="flex justify-center items-center h-screen">Loading word...</div>;
+      const res = await fetch("http://localhost:8000/api/word");
+      if (!res.ok) {
+        throw new Error("Failed to load word from API");
+      }
+      const data: Word = await res.json();
+      setCurrentWord(data);
+      setSentence("");
+    } catch (err: any) {
+      setError(err.message || "Cannot load word");
     }
+  };
 
-    return (
-        <div className="container mx-auto p-4 max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-center mb-8 text-gray-800 leading-tight">Word Challenge</h1>
+  const handleSentenceChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    setSentence(e.target.value);
+  };
 
-            <div className="bg-white p-8 rounded-2xl shadow-xl mb-6 border border-gray-100 transform hover:scale-105 transition-transform duration-300 ease-in-out">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-primary mb-2 sm:mb-0">{currentWord.word}</h2>
-                    <span className={`px-4 py-1 rounded-full text-sm font-semibold ${getDifficultyColor(currentWord.difficulty)} shadow-md`}>
-                        {currentWord.difficulty}
-                    </span>
-                </div>
-                <p className="text-lg md:text-xl text-gray-700 mb-6 leading-relaxed">{currentWord.meaning}</p>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentWord) return;
 
-                <div className="mb-6">
-                    <label htmlFor="sentence" className="block text-base font-medium text-gray-700 mb-2">Your Sentence:</label>
-                    <textarea
-                        id="sentence"
-                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition duration-200 ease-in-out resize-y text-lg"
-                        rows={4}
-                        placeholder="Type your sentence here..."
-                        value={sentence}
-                        onChange={handleSentenceChange}
-                        disabled={isSubmitted}
-                    ></textarea>
-                </div>
+    try {
+      setSubmitting(true);
+      setError(null);
 
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
-                    <p className="text-2xl font-bold">Score: <span className={`${feedbackColor} transition-colors duration-300`}>{score.toFixed(1)}</span></p>
-                    <div className="flex space-x-3">
-                        {!isSubmitted ? (
-                            <button
-                                onClick={handleSubmitSentence}
-                                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-secondary transition duration-200 ease-in-out font-medium shadow-md"
-                                disabled={!sentence.trim()}
-                            >
-                                Submit Sentence
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleNextWord}
-                                className="px-6 py-3 bg-info text-white rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out font-medium shadow-md"
-                            >
-                                Next Word
-                            </button>
-                        )}
-                    </div>
-                </div>
+      const response = await fetch(
+        "http://localhost:8000/api/validate-sentence",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            word_id: currentWord.id,
+            sentence: sentence,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to validate sentence");
+      }
+
+      const data: ValidationResult = await response.json();
+      setResult(data);
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || "Error while calling API");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const scoreColor = (score: number) => {
+    if (score >= 8) return "text-green-600";
+    if (score >= 6) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  return (
+    <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-6 space-y-4">
+        <h1 className="text-2xl font-bold mb-2">
+          Vocabulary Practice – Validate Sentence
+        </h1>
+
+        {/* แสดงคำศัพท์ปัจจุบัน */}
+        {currentWord ? (
+          <div className="border rounded-lg p-4 bg-slate-50 space-y-1">
+            <div className="text-lg font-semibold">
+              Word: <span className="text-blue-700">{currentWord.word}</span>
             </div>
-        </div>
-    );
+            <div className="text-sm text-slate-700">
+              Meaning: {currentWord.definition}
+            </div>
+            <div className="text-sm text-slate-500">
+              Level: {currentWord.difficulty_level}
+            </div>
+          </div>
+        ) : (
+          <p>Loading word...</p>
+        )}
+
+        {/* ฟอร์มกรอกประโยค */}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <label className="block text-sm font-medium">
+            Your sentence
+            <textarea
+              className="mt-1 w-full border rounded-md p-2 min-h-[100px]"
+              placeholder="Type your sentence here..."
+              value={sentence}
+              onChange={handleSentenceChange}
+              disabled={!currentWord || submitting}
+            />
+          </label>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={!currentWord || !sentence.trim() || submitting}
+              className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:bg-slate-400"
+            >
+              {submitting ? "Checking..." : "Validate Sentence"}
+            </button>
+
+            <button
+              type="button"
+              onClick={fetchWord}
+              className="px-4 py-2 rounded-md bg-slate-200 text-sm"
+            >
+              New Word
+            </button>
+          </div>
+        </form>
+
+        {/* Error message */}
+        {error && (
+          <p className="text-sm text-red-600">
+            Error: {error}
+          </p>
+        )}
+
+        {/* แสดงผลลัพธ์จาก API */}
+        {submitted && result && (
+          <div className="mt-4 border-t pt-4 space-y-2">
+            <div className={`text-lg font-semibold ${scoreColor(result.score)}`}>
+              Score: {result.score.toFixed(1)} / 10 ({result.level})
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Suggestion:</span>{" "}
+              {result.suggestion}
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Corrected sentence:</span>{" "}
+              {result.corrected_sentence}
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
 }
